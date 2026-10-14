@@ -1,0 +1,23 @@
+{
+    "name": "SuecaOnline.EditorTools",
+    "rootNamespace": "SuecaOnline.EditorTools",
+    "references": [
+        "SuecaOnline.Domain",
+        "SuecaOnline.Application",
+        "SuecaOnline.Presentation",
+        "UnityEngine.UI",
+        "Unity.TextMeshPro",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

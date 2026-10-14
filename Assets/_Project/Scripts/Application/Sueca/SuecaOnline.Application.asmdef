@@ -1,0 +1,16 @@
+{
+    "name": "SuecaOnline.Application",
+    "rootNamespace": "SuecaOnline.Application",
+    "references": [
+        "SuecaOnline.Domain"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}
