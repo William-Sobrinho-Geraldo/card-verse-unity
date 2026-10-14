@@ -53,6 +53,12 @@ namespace SuecaOnline.Domain.Sueca.Match
 
         public Suit Trump { get; private set; }
 
+        /// <summary>
+        /// Carta virada do dealer (fundo do baralho) que define o trunfo da mao.
+        /// Permanece na mao do dealer e e conhecida por todos os jogadores.
+        /// </summary>
+        public Card TrumpCard { get; private set; }
+
         public Seat Dealer { get; private set; }
 
         public Seat Leader { get; private set; }
@@ -193,7 +199,8 @@ namespace SuecaOnline.Domain.Sueca.Match
                 seat = Seats.Next(seat);
             }
 
-            Trump = _hands[(int)Dealer][CardsPerPlayer - 1].Suit;
+            TrumpCard = _hands[(int)Dealer][CardsPerPlayer - 1];
+            Trump = TrumpCard.Suit;
             Leader = Seats.Next(Dealer);
             CurrentTurn = Leader;
             _currentTrick = new Trick();

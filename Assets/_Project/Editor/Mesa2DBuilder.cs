@@ -28,8 +28,11 @@ namespace SuecaOnline.EditorTools
         private const float CardWidth = 120f;
         private const float CardHeight = 168f;
 
-        private static readonly Color FeltColor = new Color(0.06f, 0.36f, 0.18f, 1f);
-        private static readonly Color CardBackColor = new Color(0.13f, 0.22f, 0.55f, 1f);
+        private static readonly Color FeltColor = new Color(0.05f, 0.30f, 0.16f, 1f);
+        private static readonly Color CardBackColor = new Color(0.15f, 0.24f, 0.58f, 1f);
+        private static readonly Color TablePanelColor = new Color(0.02f, 0.17f, 0.09f, 0.55f);
+        private static readonly Color HandPanelColor = new Color(0.02f, 0.14f, 0.08f, 0.42f);
+        private static readonly Color TrumpPanelColor = new Color(0.02f, 0.14f, 0.08f, 0.55f);
 
         [MenuItem("Sueca/Import TMP Essential Resources")]
         public static void ImportTmpEssentials()
@@ -84,6 +87,11 @@ namespace SuecaOnline.EditorTools
 
         public static CardView BuildCardPrefab()
         {
+            Sprite cardFaceSprite = Mesa2DArtFactory.GetCardFace();
+            Sprite roundedPanelSprite = Mesa2DArtFactory.GetRoundedPanel();
+            Material rankMaterial = Mesa2DArtFactory.GetRankMaterial();
+            Material suitMaterial = Mesa2DArtFactory.GetSuitMaterial();
+
             GameObject root = new GameObject("CardPrefab", typeof(RectTransform));
             RectTransform rootRect = (RectTransform)root.transform;
             rootRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -93,33 +101,55 @@ namespace SuecaOnline.EditorTools
             RectTransform faceRect = CreateRect("Face", root.transform);
             Stretch(faceRect);
             Image face = faceRect.gameObject.AddComponent<Image>();
+            face.sprite = cardFaceSprite;
+            face.type = Image.Type.Sliced;
             face.color = Color.white;
+            AddDropShadow(face);
 
             RectTransform backRect = CreateRect("Back", root.transform);
             Stretch(backRect);
             Image back = backRect.gameObject.AddComponent<Image>();
+            back.sprite = roundedPanelSprite;
+            back.type = Image.Type.Sliced;
             back.color = CardBackColor;
             back.enabled = false;
+            AddDropShadow(back);
+
+            RectTransform highlightRect = CreateRect("Highlight", root.transform);
+            Stretch(highlightRect);
+            Image highlight = highlightRect.gameObject.AddComponent<Image>();
+            highlight.sprite = roundedPanelSprite;
+            highlight.type = Image.Type.Sliced;
+            highlight.color = new Color(1f, 1f, 1f, 0f);
+            highlight.raycastTarget = false;
 
             RectTransform rankRect = CreateRect("Rank", root.transform);
             rankRect.anchorMin = new Vector2(0f, 1f);
             rankRect.anchorMax = new Vector2(0f, 1f);
             rankRect.pivot = new Vector2(0f, 1f);
-            rankRect.anchoredPosition = new Vector2(10f, -8f);
-            rankRect.sizeDelta = new Vector2(70f, 52f);
+            rankRect.anchoredPosition = new Vector2(12f, -8f);
+            rankRect.sizeDelta = new Vector2(74f, 54f);
             TextMeshProUGUI rankText = rankRect.gameObject.AddComponent<TextMeshProUGUI>();
             rankText.text = "A";
-            rankText.fontSize = 42f;
+            rankText.fontSize = 44f;
             rankText.alignment = TextAlignmentOptions.TopLeft;
             rankText.raycastTarget = false;
+            if (rankMaterial != null)
+            {
+                rankText.fontSharedMaterial = rankMaterial;
+            }
 
             RectTransform suitRect = CreateRect("Suit", root.transform);
             Stretch(suitRect);
             TextMeshProUGUI suitText = suitRect.gameObject.AddComponent<TextMeshProUGUI>();
             suitText.text = "\u2660";
-            suitText.fontSize = 76f;
+            suitText.fontSize = 82f;
             suitText.alignment = TextAlignmentOptions.Center;
             suitText.raycastTarget = false;
+            if (suitMaterial != null)
+            {
+                suitText.fontSharedMaterial = suitMaterial;
+            }
 
             CardView view = root.AddComponent<CardView>();
             SerializedObject serializedView = new SerializedObject(view);
@@ -127,6 +157,8 @@ namespace SuecaOnline.EditorTools
             serializedView.FindProperty("_backImage").objectReferenceValue = back;
             serializedView.FindProperty("_rankText").objectReferenceValue = rankText;
             serializedView.FindProperty("_suitText").objectReferenceValue = suitText;
+            serializedView.FindProperty("_highlightOverlay").objectReferenceValue = highlight;
+            serializedView.FindProperty("_visualRoot").objectReferenceValue = rootRect;
             serializedView.ApplyModifiedPropertiesWithoutUndo();
 
             EnsureFolder(PrefabFolder);
@@ -135,6 +167,21 @@ namespace SuecaOnline.EditorTools
             AssetDatabase.SaveAssets();
 
             return AssetDatabase.LoadAssetAtPath<CardView>(PrefabPath);
+        }
+
+        private static void AddDropShadow(Graphic graphic)
+        {
+            Color color = new Color(0f, 0f, 0f, 0.32f);
+
+            Shadow soft = graphic.gameObject.AddComponent<Shadow>();
+            soft.effectColor = new Color(color.r, color.g, color.b, 0.16f);
+            soft.effectDistance = new Vector2(0f, -7f);
+            soft.useGraphicAlpha = true;
+
+            Shadow tight = graphic.gameObject.AddComponent<Shadow>();
+            tight.effectColor = color;
+            tight.effectDistance = new Vector2(0f, -3f);
+            tight.useGraphicAlpha = true;
         }
 
         public static void BuildMesa2DScene(CardView cardViewPrefab)
@@ -161,21 +208,56 @@ namespace SuecaOnline.EditorTools
             scaler.matchWidthOrHeight = 0.5f;
             canvasObject.AddComponent<GraphicRaycaster>();
 
+            Sprite roundedPanelSprite = Mesa2DArtFactory.GetRoundedPanel();
+
             RectTransform felt = CreateRect("Felt", canvasObject.transform);
             Stretch(felt);
             Image feltImage = felt.gameObject.AddComponent<Image>();
             feltImage.color = FeltColor;
             feltImage.raycastTarget = false;
 
-            TableView tableView = BuildTableArea(canvasObject.transform, cardViewPrefab);
+            RectTransform feltGrain = CreateRect("FeltGrain", canvasObject.transform);
+            Stretch(feltGrain);
+            Image feltGrainImage = feltGrain.gameObject.AddComponent<Image>();
+            feltGrainImage.sprite = Mesa2DArtFactory.GetFeltGrain();
+            feltGrainImage.type = Image.Type.Tiled;
+            feltGrainImage.pixelsPerUnitMultiplier = 8f;
+            feltGrainImage.color = new Color(1f, 1f, 1f, 1f);
+            feltGrainImage.raycastTarget = false;
 
-            RectTransform southHand = CreateHandRoot("SouthHand", canvasObject.transform, new Vector2(0.5f, 0f), new Vector2(0f, 140f), new Vector2(1500f, 220f));
-            RectTransform northHand = CreateHandRoot("NorthHand", canvasObject.transform, new Vector2(0.5f, 1f), new Vector2(0f, -90f), new Vector2(1200f, 120f));
-            RectTransform westHand = CreateHandRoot("WestHand", canvasObject.transform, new Vector2(0f, 0.5f), new Vector2(90f, 0f), new Vector2(140f, 700f));
-            RectTransform eastHand = CreateHandRoot("EastHand", canvasObject.transform, new Vector2(1f, 0.5f), new Vector2(-90f, 0f), new Vector2(140f, 700f));
+            RectTransform vignette = CreateRect("Vignette", canvasObject.transform);
+            Stretch(vignette);
+            Image vignetteImage = vignette.gameObject.AddComponent<Image>();
+            vignetteImage.sprite = Mesa2DArtFactory.GetVignette();
+            vignetteImage.type = Image.Type.Simple;
+            vignetteImage.color = Color.white;
+            vignetteImage.raycastTarget = false;
+
+            TableView tableView = BuildTableArea(canvasObject.transform, cardViewPrefab, roundedPanelSprite);
+
+            RectTransform southHand = CreateHandRoot("SouthHand", canvasObject.transform, new Vector2(0.5f, 0f), new Vector2(0f, 150f), new Vector2(920f, 200f));
+            RectTransform northHand = CreateHandRoot("NorthHand", canvasObject.transform, new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(920f, 160f));
+            RectTransform westHand = CreateHandRoot("WestHand", canvasObject.transform, new Vector2(0f, 0.5f), new Vector2(110f, 0f), new Vector2(150f, 520f));
+            RectTransform eastHand = CreateHandRoot("EastHand", canvasObject.transform, new Vector2(1f, 0.5f), new Vector2(-110f, 0f), new Vector2(150f, 520f));
+
+            AddRoundedPanel(southHand, roundedPanelSprite, HandPanelColor);
+            AddRoundedPanel(northHand, roundedPanelSprite, HandPanelColor);
+            AddRoundedPanel(westHand, roundedPanelSprite, HandPanelColor);
+            AddRoundedPanel(eastHand, roundedPanelSprite, HandPanelColor);
 
             TextMeshProUGUI trumpText = CreateText("TrumpText", canvasObject.transform, new Vector2(0f, 1f), new Vector2(24f, -24f), new Vector2(420f, 60f), TextAlignmentOptions.TopLeft, 36f, Color.white);
             trumpText.text = "Trunfo: -";
+
+            TextMeshProUGUI trumpSlotLabel = CreateText("TrumpSlotLabel", canvasObject.transform, new Vector2(0f, 1f), new Vector2(110f, -96f), new Vector2(160f, 40f), TextAlignmentOptions.Center, 28f, new Color(1f, 0.96f, 0.7f, 1f));
+            trumpSlotLabel.text = "TRUNFO";
+
+            RectTransform trumpSlot = CreateRect("TrumpSlot", canvasObject.transform);
+            trumpSlot.anchorMin = new Vector2(0f, 1f);
+            trumpSlot.anchorMax = new Vector2(0f, 1f);
+            trumpSlot.pivot = new Vector2(0.5f, 0.5f);
+            trumpSlot.anchoredPosition = new Vector2(110f, -212f);
+            trumpSlot.sizeDelta = new Vector2(CardWidth + 20f, CardHeight + 20f);
+            AddRoundedPanel(trumpSlot, roundedPanelSprite, TrumpPanelColor);
 
             TextMeshProUGUI scoreText = CreateText("ScoreText", canvasObject.transform, new Vector2(1f, 1f), new Vector2(-24f, -24f), new Vector2(760f, 60f), TextAlignmentOptions.TopRight, 32f, Color.white);
             scoreText.text = "Nos (N/S): 0 pts - 0 jogos  |  Eles (L/O): 0 pts - 0 jogos";
@@ -204,6 +286,7 @@ namespace SuecaOnline.EditorTools
             serializedManager.FindProperty("_eastHandRoot").objectReferenceValue = eastHand;
             serializedManager.FindProperty("_westHandRoot").objectReferenceValue = westHand;
             serializedManager.FindProperty("_cardViewPrefab").objectReferenceValue = cardViewPrefab;
+            serializedManager.FindProperty("_trumpSlot").objectReferenceValue = trumpSlot;
             serializedManager.FindProperty("_trumpText").objectReferenceValue = trumpText;
             serializedManager.FindProperty("_scoreText").objectReferenceValue = scoreText;
             serializedManager.FindProperty("_statusText").objectReferenceValue = statusText;
@@ -218,7 +301,7 @@ namespace SuecaOnline.EditorTools
             RegisterSceneInBuildSettings();
         }
 
-        private static TableView BuildTableArea(Transform parent, CardView cardViewPrefab)
+        private static TableView BuildTableArea(Transform parent, CardView cardViewPrefab, Sprite roundedPanelSprite)
         {
             RectTransform tableRect = CreateRect("Table", parent);
             tableRect.anchorMin = new Vector2(0.5f, 0.5f);
@@ -226,6 +309,8 @@ namespace SuecaOnline.EditorTools
             tableRect.pivot = new Vector2(0.5f, 0.5f);
             tableRect.anchoredPosition = new Vector2(0f, 0f);
             tableRect.sizeDelta = new Vector2(760f, 760f);
+
+            AddRoundedPanel(tableRect, roundedPanelSprite, TablePanelColor);
 
             TableView tableView = tableRect.gameObject.AddComponent<TableView>();
 
@@ -258,6 +343,21 @@ namespace SuecaOnline.EditorTools
             rect.anchoredPosition = position;
             rect.sizeDelta = new Vector2(CardWidth, CardHeight);
             return rect;
+        }
+
+        private static Image AddRoundedPanel(RectTransform rect, Sprite roundedPanelSprite, Color color)
+        {
+            Image image = rect.gameObject.GetComponent<Image>();
+            if (image == null)
+            {
+                image = rect.gameObject.AddComponent<Image>();
+            }
+
+            image.sprite = roundedPanelSprite;
+            image.type = Image.Type.Sliced;
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
         }
 
         private static TextMeshProUGUI CreateText(

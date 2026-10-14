@@ -79,6 +79,47 @@ namespace SuecaOnline.Tests.EditMode
         }
 
         [Test]
+        public void DealRound_ExposesTrumpCard_FromDealerLastCard()
+        {
+            MatchState match = StartDealtMatch(42);
+
+            Card dealerLastCard = match.GetHand(match.Dealer)[MatchState.CardsPerPlayer - 1];
+
+            Assert.AreEqual(dealerLastCard, match.TrumpCard, "A carta de trunfo e a ultima carta do dealer.");
+            Assert.AreEqual(match.TrumpCard.Suit, match.Trump, "O naipe do trunfo vem da carta virada.");
+        }
+
+        [Test]
+        public void DealRound_ExposesSameTrumpCard_ForSameSeed()
+        {
+            MatchState first = StartDealtMatch(2026);
+            MatchState second = StartDealtMatch(2026);
+
+            Assert.AreEqual(first.TrumpCard, second.TrumpCard);
+        }
+
+        [Test]
+        public void BeginNextTrick_WinnerLeadsNextTrick()
+        {
+            MatchState match = StartDealtMatch(2024);
+
+            while (match.Phase == GamePhase.AwaitingPlayerMove)
+            {
+                Seat seat = match.CurrentTurn;
+                IReadOnlyList<Card> legal = match.GetLegalMoves(seat);
+                match.PlayCard(seat, legal[0]);
+            }
+
+            Assert.AreEqual(GamePhase.ResolvingTrick, match.Phase);
+
+            TrickRecord record = match.ResolveTrick();
+            match.BeginNextTrick();
+
+            Assert.AreEqual(record.Winner, match.CurrentTurn, "O vencedor da vaza inicia a proxima.");
+            Assert.AreEqual(record.Winner, match.Leader);
+        }
+
+        [Test]
         public void DealRound_IsDeterministic_ForSameSeed()
         {
             MatchState first = StartDealtMatch(2026);

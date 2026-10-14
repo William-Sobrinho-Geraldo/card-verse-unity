@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using SuecaOnline.Application.Sueca;
@@ -35,6 +36,9 @@ namespace SuecaOnline.Presentation.UI
         [SerializeField, Tooltip("Prefab de carta usado nas maos.")]
         private CardView _cardViewPrefab;
 
+        [SerializeField, Tooltip("Slot dedicado que exibe a carta de trunfo (carta virada do dealer).")]
+        private RectTransform _trumpSlot;
+
         [SerializeField, Tooltip("Texto do trunfo.")]
         private TextMeshProUGUI _trumpText;
 
@@ -56,8 +60,8 @@ namespace SuecaOnline.Presentation.UI
         [SerializeField, Tooltip("Atraso (segundos) entre jogadas automaticas.")]
         private float _aiDelay = 0.6f;
 
-        [SerializeField, Tooltip("Semente base para distribuicoes reproduziveis.")]
-        private int _baseSeed = 2024;
+        [SerializeField, Tooltip("Semente base fixa para partidas reproduziveis. Use 0 para aleatoriedade real a cada partida.")]
+        private int _fixedSeed;
 
         private const float VerticalHandSpacing = 34f;
         private const float HorizontalHandSpacing = 78f;
@@ -66,6 +70,8 @@ namespace SuecaOnline.Presentation.UI
 
         private MatchState _match;
         private Coroutine _flow;
+        private CardView _trumpCardView;
+        private int _matchSeed;
 
         public MatchState Match
         {
@@ -75,6 +81,12 @@ namespace SuecaOnline.Presentation.UI
         public TableView Table
         {
             get { return _tableView; }
+        }
+
+        /// <summary>Carta de trunfo atualmente renderizada no slot dedicado (nula se ausente).</summary>
+        public CardView TrumpCardView
+        {
+            get { return _trumpCardView; }
         }
 
         /// <summary>Quantidade de cartas atualmente renderizadas para um assento.</summary>
@@ -96,6 +108,7 @@ namespace SuecaOnline.Presentation.UI
 
         private void Awake()
         {
+            _matchSeed = GenerateMatchSeed();
             _match = MatchState.CreateDeterministic();
             Subscribe();
 
@@ -118,15 +131,7 @@ namespace SuecaOnline.Presentation.UI
 
         private void Start()
         {
-            if (_cardViewPrefab == null)
-            {
-                CardView loadedPrefab = null;
-#if UNITY_EDITOR
-                loadedPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<CardView>("Assets/_Project/Prefabs/CardPrefab.prefab");
-#endif
-                _cardViewPrefab = loadedPrefab;
-            }
-
+            EnsureCardViewPrefab();
             _match.StartMatch();
             StartRound();
         }
@@ -137,22 +142,49 @@ namespace SuecaOnline.Presentation.UI
             Unsubscribe();
         }
 
-        /// <summary>Recria a partida do zero (nova semente deterministica).</summary>
+        /// <summary>Recria a partida do zero com uma nova distribuicao aleatoria.</summary>
         public void StartNewMatch()
+        {
+            RecreateMatch(GenerateMatchSeed());
+        }
+
+        /// <summary>
+        /// Recria a partida com uma semente explicita. Destinado a testes/replay,
+        /// preservando o determinismo sem afetar o fluxo aleatorio padrao.
+        /// </summary>
+        public void StartNewMatch(int seed)
+        {
+            RecreateMatch(seed);
+        }
+
+        private void RecreateMatch(int seed)
         {
             StopFlow();
             Unsubscribe();
             ClearAllSeatViews();
+            ClearTrumpCard();
 
             if (_tableView != null)
             {
                 _tableView.ClearTrick();
             }
 
+            _matchSeed = seed;
             _match = MatchState.CreateDeterministic();
             Subscribe();
             _match.StartMatch();
             StartRound();
+        }
+
+        private int GenerateMatchSeed()
+        {
+            if (_fixedSeed != 0)
+            {
+                return _fixedSeed;
+            }
+
+            int seed = Guid.NewGuid().GetHashCode();
+            return seed == 0 ? 1 : seed;
         }
 
         private void StartNextRound()
@@ -186,10 +218,48 @@ namespace SuecaOnline.Presentation.UI
                 _winnerText.gameObject.SetActive(false);
             }
 
-            _match.DealRound(_baseSeed + _match.RoundNumber);
+            EnsureCardViewPrefab();
+            _match.DealRound(_matchSeed + _match.RoundNumber);
             BuildAllSeatViews();
+            ShowTrumpCard();
             RefreshHud();
             PumpFlow();
+        }
+
+        /// <summary>
+        /// Exibe a carta virada do dealer (trunfo) no slot dedicado. Chamada logo apos
+        /// a distribuicao, antes de qualquer carta ser baixada na primeira vaza.
+        /// </summary>
+        private void ShowTrumpCard()
+        {
+            ClearTrumpCard();
+
+            if (_trumpSlot == null || _cardViewPrefab == null || _match == null)
+            {
+                return;
+            }
+
+            CardView view = Instantiate(_cardViewPrefab, _trumpSlot);
+            view.name = "TrumpCard";
+
+            RectTransform rect = (RectTransform)view.transform;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.localScale = Vector3.one;
+
+            view.SetCard(_match.TrumpCard, true);
+            view.IsInteractable = false;
+            _trumpCardView = view;
+        }
+
+        private void ClearTrumpCard()
+        {
+            if (_trumpCardView != null)
+            {
+                Destroy(_trumpCardView.gameObject);
+                _trumpCardView = null;
+            }
         }
 
         /// <summary>
@@ -344,16 +414,23 @@ namespace SuecaOnline.Presentation.UI
             }
         }
 
+        private void EnsureCardViewPrefab()
+        {
+            if (_cardViewPrefab != null)
+            {
+                return;
+            }
+
+            CardView loadedPrefab = null;
+#if UNITY_EDITOR
+            loadedPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<CardView>("Assets/_Project/Prefabs/CardPrefab.prefab");
+#endif
+            _cardViewPrefab = loadedPrefab;
+        }
+
         private void BuildSeatViews(Seat seat)
         {
-            if (_cardViewPrefab == null)
-            {
-                CardView loadedPrefab = null;
-#if UNITY_EDITOR
-                loadedPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<CardView>("Assets/_Project/Prefabs/CardPrefab.prefab");
-#endif
-                _cardViewPrefab = loadedPrefab;
-            }
+            EnsureCardViewPrefab();
 
             List<CardView> views = GetSeatList(seat);
             views.Clear();
