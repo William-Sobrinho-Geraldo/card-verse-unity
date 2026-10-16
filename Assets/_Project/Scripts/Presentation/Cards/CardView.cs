@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using SuecaOnline.Domain.Sueca.Cards;
+using SuecaOnline.Presentation.Animation;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -65,12 +66,28 @@ namespace SuecaOnline.Presentation.Cards
         private bool _isHovered;
         private bool _isPressed;
         private Coroutine _visualRoutine;
+        private Coroutine _shakeRoutine;
+        private RectTransform _rectTransform;
 
         public event Action<ICardView> Clicked;
 
         public Card Card { get; private set; }
 
         public bool IsFaceUp { get; private set; }
+
+        /// <summary>Transform usado pelas animacoes de carta (movimento/escala de mundo UI).</summary>
+        public RectTransform Rect
+        {
+            get
+            {
+                if (_rectTransform == null)
+                {
+                    _rectTransform = (RectTransform)transform;
+                }
+
+                return _rectTransform;
+            }
+        }
 
         public bool IsInteractable
         {
@@ -128,6 +145,31 @@ namespace SuecaOnline.Presentation.Cards
         {
             IsFaceUp = faceUp;
             ApplyOrientation();
+        }
+
+        /// <summary>
+        /// Feedback visual de jogada invalida: sacode a carta horizontalmente sem alterar
+        /// o estado do jogo. Retorna imediatamente; a animacao roda em paralelo.
+        /// </summary>
+        public void PlayShake(float duration = 0.45f, float magnitude = 20f)
+        {
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+
+            if (_shakeRoutine != null)
+            {
+                StopCoroutine(_shakeRoutine);
+            }
+
+            _shakeRoutine = StartCoroutine(ShakeRoutine(duration, magnitude));
+        }
+
+        private IEnumerator ShakeRoutine(float duration, float magnitude)
+        {
+            yield return CardAnimator.Shake(Rect, duration, magnitude);
+            _shakeRoutine = null;
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -199,6 +241,12 @@ namespace SuecaOnline.Presentation.Cards
             {
                 StopCoroutine(_visualRoutine);
                 _visualRoutine = null;
+            }
+
+            if (_shakeRoutine != null)
+            {
+                StopCoroutine(_shakeRoutine);
+                _shakeRoutine = null;
             }
 
             VisualRoot.localScale = Vector3.one;
@@ -337,6 +385,24 @@ namespace SuecaOnline.Presentation.Cards
         private static bool IsRedSuit(Suit suit)
         {
             return suit == Suit.Ouros || suit == Suit.Copas;
+        }
+
+        /// <summary>Nome do naipe em portugues, usado em mensagens ao jogador.</summary>
+        public static string SuitLabel(Suit suit)
+        {
+            switch (suit)
+            {
+                case Suit.Ouros:
+                    return "Ouros";
+                case Suit.Copas:
+                    return "Copas";
+                case Suit.Espadas:
+                    return "Espadas";
+                case Suit.Paus:
+                    return "Paus";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(suit), suit, "Naipe desconhecido.");
+            }
         }
     }
 }

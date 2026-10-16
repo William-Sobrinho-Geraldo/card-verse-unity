@@ -272,6 +272,12 @@ namespace SuecaOnline.EditorTools
             Button nextHandButton = CreateButton("NextHandButton", canvasObject.transform, new Vector2(1f, 0f), new Vector2(-150f, 90f), new Vector2(240f, 64f), "Proxima mao");
             Button newMatchButton = CreateButton("NewMatchButton", canvasObject.transform, new Vector2(1f, 0f), new Vector2(-150f, 170f), new Vector2(240f, 64f), "Nova partida");
 
+            RectTransform feedbackRect = CreateRect("FeedbackLayer", canvasObject.transform);
+            Stretch(feedbackRect);
+            GameFeedbackUI feedback = feedbackRect.gameObject.AddComponent<GameFeedbackUI>();
+            feedback.SetRoundedSprite(roundedPanelSprite);
+            feedback.EnsureBuilt();
+
             GameObject eventSystemObject = new GameObject("EventSystem");
             eventSystemObject.AddComponent<EventSystem>();
             InputSystemUIInputModule inputModule = eventSystemObject.AddComponent<InputSystemUIInputModule>();
@@ -293,6 +299,7 @@ namespace SuecaOnline.EditorTools
             serializedManager.FindProperty("_winnerText").objectReferenceValue = winnerText;
             serializedManager.FindProperty("_nextHandButton").objectReferenceValue = nextHandButton;
             serializedManager.FindProperty("_newMatchButton").objectReferenceValue = newMatchButton;
+            serializedManager.FindProperty("_feedbackUI").objectReferenceValue = feedback;
             serializedManager.ApplyModifiedPropertiesWithoutUndo();
 
             EnsureFolder(SceneFolder);
